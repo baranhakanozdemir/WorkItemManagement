@@ -1,4 +1,7 @@
 using DomainServices.Core.Responses;
+using DomainServices.Core.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using WorkItemManagement.Core.Services;
 using WorkItemManagement.Core.Entities;
 using WorkItemManagement.Core;
@@ -27,18 +30,39 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
     private readonly IWorkItemRepository _workItemRepository;
     private readonly IWorkItemCommitRefService? _commitRefs;
     private readonly IWorkItemBlockerService? _blockers;
+    private readonly IWorkItemStateSync _stateSync;
+    private readonly ILogger<WorkItemService> _logger;
 
     public WorkItemService(IWorkItemRepository repository, IAuditWriter auditWriter)
+        : this(repository, auditWriter, NullLogger<WorkItemService>.Instance)
+    {
+    }
+
+    public WorkItemService(
+        IWorkItemRepository repository,
+        IAuditWriter auditWriter,
+        ILogger<WorkItemService> logger)
+        : this(repository, auditWriter, logger, NullWorkItemStateSync.Instance)
+    {
+    }
+
+    public WorkItemService(
+        IWorkItemRepository repository,
+        IAuditWriter auditWriter,
+        ILogger<WorkItemService> logger,
+        IWorkItemStateSync stateSync)
         : base(repository, auditWriter)
     {
         _workItemRepository = repository;
+        _stateSync = stateSync;
+        _logger = logger;
     }
 
     public WorkItemService(
         IWorkItemRepository repository,
         IAuditWriter auditWriter,
         IWorkItemBlockerService? blockers)
-        : this(repository, auditWriter)
+        : this(repository, auditWriter, NullLogger<WorkItemService>.Instance, NullWorkItemStateSync.Instance)
     {
         _blockers = blockers;
     }
@@ -48,7 +72,7 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
         IAuditWriter auditWriter,
         IWorkItemCommitRefService commitRefs,
         IWorkItemBlockerService? blockers)
-        : this(repository, auditWriter)
+        : this(repository, auditWriter, NullLogger<WorkItemService>.Instance, NullWorkItemStateSync.Instance)
     {
         _commitRefs = commitRefs;
         _blockers = blockers;
@@ -218,6 +242,7 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
         // land here; callers that omit Priority get Medium via `WorkItem.Priority` initializer.
 
         var warnings = ValidateHierarchy(model, parent: await ResolveParentAsync(model, cancellationToken).ConfigureAwait(false));
+        LogHierarchyWarnings(model.Id, warnings);
 
         var response = await AddAsync(enterpriseId, model, userName, cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessful || response.Data is null)
@@ -289,7 +314,13 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
 
         if (to != WorkItemState.Cancelled && SkippedIntermediates(from, to) is { Length: > 0 } skipped)
         {
-            // AC: skipping states is allowed (do not block) but surfaced as a warning.
+            // AC: skipping states is allowed (do not block) but logged at Warning level.
+            _logger.LogWarning(
+                "WorkItem {WorkItemId} transitioned from {FromState} to {ToState}, skipping intermediates: {Skipped}",
+                workItemId,
+                from,
+                to,
+                string.Join(", ", skipped));
             warnings.Add(new WorkItemValidationWarning(
                 "work-item.transition.skipped-states",
                 $"Transition from '{from}' to '{to}' skipped intermediate state(s): {string.Join(", ", skipped)}."));
@@ -304,6 +335,8 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
             throw new InvalidOperationException(
                 $"Failed to transition work item {workItemId} from {from} to {to}: {response.Message ?? "no message"}");
         }
+
+        await TryWriteBackStateAsync(response.Data, userName, cancellationToken).ConfigureAwait(false);
 
         return new WorkItemMutationResult(response.Data, warnings);
     }
@@ -322,6 +355,21 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
         }
 
         return await TransitionAsync(workItemId, to, userName, cancellationToken).ConfigureAwait(false);
+    }
+
+    private void LogHierarchyWarnings(Guid workItemId, IReadOnlyList<WorkItemValidationWarning> warnings)
+    {
+        // Per docs/23 WS9: every hierarchy violation logs at Warning level so the
+        // platform retains operational visibility even when a client ignores the
+        // returned warnings or aggregates them silently.
+        foreach (var warning in warnings)
+        {
+            _logger.LogWarning(
+                "WorkItem {WorkItemId} hierarchy warning {WarningCode}: {WarningMessage}",
+                workItemId,
+                warning.Code,
+                warning.Message);
+        }
     }
 
     private async Task<WorkItem?> ResolveParentAsync(WorkItem model, CancellationToken cancellationToken)
@@ -496,6 +544,33 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
         }
 
         return string.Equals(reference.BuildStatus, "Passing", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async System.Threading.Tasks.Task TryWriteBackStateAsync(
+        WorkItem workItem,
+        string actor,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _stateSync
+                .WriteBackStateAsync(workItem, actor, cancellationToken)
+                .ConfigureAwait(false);
+            if (!result.Succeeded)
+            {
+                _logger.LogWarning(
+                    "Work-management state write-back failed for work item {WorkItemId}: {Error}",
+                    workItem.Id,
+                    result.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Work-management state write-back threw for work item {WorkItemId}.",
+                workItem.Id);
+        }
     }
 
     public async Task<WorkItem?> AddByProjectAsync(Guid projectId, WorkItem model, CancellationToken cancellationToken = default)
