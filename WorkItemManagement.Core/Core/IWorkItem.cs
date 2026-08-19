@@ -1,7 +1,5 @@
 using DomainServices.Core.Models;
 using WorkItemManagement.Core.Entities;
-using WorkItemManagement.Core.Entities;
-using WorkItemManagement.Core.Entities;
 
 namespace WorkItemManagement.Core;
 

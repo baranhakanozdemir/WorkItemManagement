@@ -1,10 +1,20 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>WorkItemManagement.Core</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>baranhakanozdemir</Authors>
+    <Description>Canonical work-item domain model: entities, services, and repository interfaces. Extracted from PlusTeam.</Description>
+    <RepositoryUrl>https://github.com/baranhakanozdemir/WorkItemManagement</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="DomainServices.Core" Version="0.2.1" />

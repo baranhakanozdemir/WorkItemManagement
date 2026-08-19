@@ -1,5 +1,4 @@
 using WorkItemManagement.Core;
-using WorkItemManagement.Core;
 
 namespace WorkItemManagement.Core.Entities;
 
