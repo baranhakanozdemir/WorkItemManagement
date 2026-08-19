@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>WorkItemManagement.Core</PackageId>
-    <Version>0.3.0</Version>
+    <Version>0.3.1</Version>
     <Authors>baranhakanozdemir</Authors>
     <Description>Canonical work-item domain model: entities, services, and repository interfaces. Extracted from PlusTeam.</Description>
     <RepositoryUrl>https://github.com/baranhakanozdemir/WorkItemManagement</RepositoryUrl>
