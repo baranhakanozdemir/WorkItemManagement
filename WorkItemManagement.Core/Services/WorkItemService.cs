@@ -486,7 +486,7 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
     }
 
     private static bool IsStartableExecutionItem(WorkItem item) =>
-        item.Type is WorkItemType.Task or WorkItemType.Bug
+        item.Type is WorkItemType.UserStory or WorkItemType.Bug
         && item.AssignedToId is not null
         && item.State is WorkItemState.Backlog or WorkItemState.ToDo;
 
