@@ -564,7 +564,7 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
                     result.Error);
             }
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
             _logger.LogWarning(
                 ex,
