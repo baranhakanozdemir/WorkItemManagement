@@ -31,6 +31,7 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
     private readonly IWorkItemCommitRefService? _commitRefs;
     private readonly IWorkItemBlockerService? _blockers;
     private readonly IWorkItemStateSync _stateSync;
+    private readonly IWorkItemCompletionOverride _completionOverride;
     private readonly ILogger<WorkItemService> _logger;
 
     public WorkItemService(IWorkItemRepository repository, IAuditWriter auditWriter)
@@ -55,7 +56,27 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
     {
         _workItemRepository = repository;
         _stateSync = stateSync;
+        _completionOverride = NullWorkItemCompletionOverride.Instance;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Fully-wired constructor for hosts that supply commit-ref evidence, blockers,
+    /// external state write-back, and an out-of-band completion override.
+    /// </summary>
+    public WorkItemService(
+        IWorkItemRepository repository,
+        IAuditWriter auditWriter,
+        ILogger<WorkItemService> logger,
+        IWorkItemStateSync stateSync,
+        IWorkItemCommitRefService? commitRefs,
+        IWorkItemBlockerService? blockers,
+        IWorkItemCompletionOverride completionOverride)
+        : this(repository, auditWriter, logger, stateSync)
+    {
+        _commitRefs = commitRefs;
+        _blockers = blockers;
+        _completionOverride = completionOverride;
     }
 
     public WorkItemService(
@@ -524,6 +545,13 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
         Guid workItemId,
         CancellationToken cancellationToken)
     {
+        // An out-of-band manual completion override (e.g. a human-approved delivery
+        // exception) satisfies the gate on its own, even with no commit evidence.
+        if (await _completionOverride.HasForWorkItemAsync(projectId, workItemId, cancellationToken).ConfigureAwait(false))
+        {
+            return true;
+        }
+
         if (_commitRefs is null)
         {
             return false;
