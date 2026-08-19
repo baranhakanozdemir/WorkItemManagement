@@ -1,0 +1,44 @@
+name: Publish package
+
+# Publishes WorkItemManagement.Core to the baranhakanozdemir GitHub Packages (NuGet) feed.
+# Runs as the repository (GITHUB_TOKEN), which can publish a package linked to this repo —
+# this is why CI can publish even though a collaborator PAT cannot on a personal namespace.
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'WorkItemManagement.Core/**'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # DomainServices.Core is a private package on the same feed. Restoring it needs the feed
+      # token; the committed nuget.config reads it from %GITHUB_TOKEN_FEED%. GITHUB_TOKEN can read
+      # it only if the DomainServices.Core package has granted this repo read access
+      # (package -> Package settings -> Manage Actions access -> add WorkItemManagement, Read).
+      - name: Restore
+        env:
+          GITHUB_TOKEN_FEED: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet restore WorkItemManagement.Core/WorkItemManagement.Core.csproj
+
+      - name: Pack
+        run: dotnet pack WorkItemManagement.Core/WorkItemManagement.Core.csproj -c Release -o artifacts --no-restore
+
+      - name: Publish to GitHub Packages
+        run: >
+          dotnet nuget push "artifacts/*.nupkg"
+          --source "https://nuget.pkg.github.com/baranhakanozdemir/index.json"
+          --api-key ${{ secrets.GITHUB_TOKEN }}
+          --skip-duplicate
