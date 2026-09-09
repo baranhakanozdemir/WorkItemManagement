@@ -14,22 +14,15 @@
          those still fail the build. -->
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <PackageId>WorkItemManagement.Core</PackageId>
-    <Version>0.4.0</Version>
+    <Version>0.5.0</Version>
     <Authors>baranhakanozdemir</Authors>
-    <Description>Canonical work-item domain model and WBS planning surface: entities, services, repository interfaces, and the readiness rules that decide whether a proposed work breakdown is fit for review. Extracted from PlusTeam.</Description>
+    <Description>Canonical work-item domain model: entities, services, and repository interfaces. Extracted from PlusTeam.</Description>
     <RepositoryUrl>https://github.com/baranhakanozdemir/WorkItemManagement</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- The ported plusteam tests exercise internal members (e.g. ParseObjectiveNumber) exactly as
-         they did before the move. Widening those members to public to make them testable would have
-         changed the surface the move was supposed to preserve. -->
-    <InternalsVisibleTo Include="WorkItemManagement.Core.Tests" />
   </ItemGroup>
 
   <ItemGroup>

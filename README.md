@@ -1,82 +1,40 @@
 # WorkItemManagement
 
-The canonical work-item domain model — entities, services, and repository interfaces — plus the
-work-breakdown planning surface that decides whether a proposed breakdown is fit for review.
+The canonical work-item domain model — entities, services, and repository interfaces.
 
 Consumers map the entities onto their own `DbContext` and compose the services. The package holds
 no EF dependency and opens no connections of its own.
 
-## Surfaces
+## Scope
 
-### Work items (`WorkItemManagement.Core`)
+**Work item management, and nothing else.** Work items and their kinds, blockers, relations, commit
+refs, and requirement links.
 
-The post-approval executable work: `WorkItem` and its kinds, blockers, relations, commit refs, and
-requirement links, with a repository interface and a service per aggregate.
+That boundary is deliberate and has no exceptions. Planning — the work-breakdown structure a
+customer reviews before approval, the rules that judge whether it is fit for review, and the
+requirement and deliverable data it is judged against — is a different domain with a different
+owner. It is not shipped here, however convenient it would be for a consumer to find it here.
 
-### Planning (`WorkItemManagement.Core.Planning`)
+The distinction to keep in mind: `RequirementWorkItemLink` belongs here, because linking a work item
+to a requirement is work item management. Reading, normalizing or judging requirements does not.
 
-The pre-approval proposal: reading a breakdown a client submitted, and judging whether it is ready
-for a customer to review.
+## Surface
 
-```csharp
-if (!WbsStructurePayloadReader.TryRead(body, out var payload, out var errors, out var warnings))
-{
-    return Reject(errors);
-}
+| Type | What it is |
+|---|---|
+| `WorkItem` and its kinds (`Epic`, `Feature`, `UserStory`, `Task`, `Bug`) | The executable work that exists after a plan is approved |
+| `WorkItemBlocker` | What is stopping an item, and why |
+| `WorkItemRelation` | How items relate to each other |
+| `WorkItemCommitRef` | The commits that delivered an item |
+| `RequirementWorkItemLink` | Which requirement an item implements |
 
-var readiness = WbsReviewReadinessEvaluator.Evaluate(
-    payload,
-    WbsStructureSource.Summarizer,
-    traceabilityContext);
-```
+Each has a repository interface and a service. `IWorkItemStateSync` and
+`IWorkItemCompletionOverride` are the extension points a consumer implements.
 
-`Evaluate` is a pure function — no dependency injection, no `DbContext`, no HTTP. That is what makes
-shipping the rules viable: a consumer runs the compiled rules rather than a copy of them, so the
-rules cannot fork.
+## Version note
 
-**Read JSON only through `WbsStructurePayloadReader`.** `WbsStructurePayload` carries explicit
-`JsonPropertyName` attributes on every member, which makes deserializing it directly look safe. It
-is not. Seven normalizations and validations sit between a client's body and a payload that can be
-evaluated, each added after the missing one produced a wrong answer in production — most sharply,
-`kind` is an enum whose zero value is `Epic`, so a plain deserialize reads an omitted kind as a
-deliberate `Epic`. Every one of those defects fails quietly: the payload parses, evaluation runs,
-and the verdict is wrong. The reader's own documentation lists all seven.
-
-Structural validation — node title and key lengths — is deliberately *not* in this package. Those
-bounds are the columns of the table that stores approved nodes, which this package does not own.
-
-### Authoring buffer
-
-`WbsAuthoringBuffer` (table `wbs_authoring_buffers`) holds one proposed breakdown per project while
-it is being authored. `EnterpriseId` and `IsDeleted` behave exactly as they do on `WorkItem`, so
-register the same tenant and soft-delete query filters — a divergence there returns wrong rows
-silently rather than failing.
-
-`IWbsAuthoringBufferService.ReplaceAsync` returns a write result, never a readiness verdict. Writing
-and judging stay separate: folding the gate into the write makes a rejected evaluation look like a
-failed write when the proposal is in fact stored, and an author told the write failed will write it
-again.
-
-### Authoring context
-
-`IWbsAuthoringContextService` returns the requirements and deliverables a breakdown must cover — a
-service rather than mapped entities, because requirements are stored as a base type with subtypes
-across more than one table. A consumer mapping a single flat table would read some rows and miss
-others, and since the evaluator reports the missing ones as uncovered, a partial read produces a
-coverage failure the breakdown does not deserve, indistinguishable from a real one.
-
-Requirement descriptions are returned in full. A caller cites requirements by identifier and needs
-the text to plan against; a truncated description defeats the purpose of the call.
-
-## Versioning note for consumers
-
-Evaluation-rule changes reach a consumer only when it upgrades the package version. That is the
-intended trade — one compiled rule, versioned — but it means a rule fix is not live for a consumer
-until they bump.
-
-## Tests
-
-`dotnet test` runs the suite. The planning tests are ported verbatim from the codebase the rules
-were extracted from: their assertions are the parity evidence that the moved rules still decide the
-same way. A green build is not that evidence — this package's own 0.3.1 shipped an inverted enum
-that compiled cleanly.
+**0.5.0 removes the WBS planning surface that 0.4.0 added.** 0.4.0 shipped a work-breakdown
+readiness engine, a JSON read boundary, and an authoring buffer. None of that is work item
+management, and it should not have been published here. If you are on 0.4.0 and using
+`WorkItemManagement.Core.Planning`, `IWbsAuthoringBufferService` or `IWbsAuthoringContextService`,
+those types are gone in 0.5.0 and are not being relocated into this package under another name.
