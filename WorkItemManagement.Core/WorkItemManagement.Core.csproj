@@ -7,7 +7,7 @@
     <PackageId>WorkItemManagement.Core</PackageId>
     <Version>0.4.0</Version>
     <Authors>baranhakanozdemir</Authors>
-    <Description>Canonical work-item domain model: entities, services, and repository interfaces. Extracted from PlusTeam.</Description>
+    <Description>Canonical work-item domain model and WBS planning surface: entities, services, repository interfaces, and the readiness rules that decide whether a proposed work breakdown is fit for review. Extracted from PlusTeam.</Description>
     <RepositoryUrl>https://github.com/baranhakanozdemir/WorkItemManagement</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
