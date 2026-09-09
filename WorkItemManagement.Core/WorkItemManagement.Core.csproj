@@ -4,6 +4,15 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- The documentation on these types is the contract: what each rule refuses and why, and
+         which of seven quiet defects a step prevents. Without this it never leaves the repo, and a
+         consumer sees bare signatures in IntelliSense. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591 is "this public member has no doc comment", which the pre-0.4.0 work-item surface
+         trips on throughout. Documenting that surface is its own work; silencing it here keeps the
+         warnings that matter visible - a broken cref or a malformed block is a doc that lies, and
+         those still fail the build. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
     <PackageId>WorkItemManagement.Core</PackageId>
     <Version>0.4.0</Version>
     <Authors>baranhakanozdemir</Authors>

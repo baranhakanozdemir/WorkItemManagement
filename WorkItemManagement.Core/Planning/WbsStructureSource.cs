@@ -1,8 +1,9 @@
 namespace WorkItemManagement.Core.Planning;
 
 /// <summary>
-/// Provenance for a persisted <see cref="Models.WbsStructures.WbsStructure"/> emission (#1587).
-/// Consumed by customer planning state to gate approval.
+/// How a <see cref="WbsStructurePayload"/> was produced (#1587). Readiness treats the sources
+/// differently: a structure that did not come from converged deliberation is not review-ready
+/// however well-formed it is.
 /// </summary>
 public enum WbsStructureSource
 {

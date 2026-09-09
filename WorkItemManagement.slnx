@@ -1,4 +1,4 @@
 <Solution>
   <Project Path="WorkItemManagement.Core/WorkItemManagement.Core.csproj" Id="cfa04974-840e-4423-8f83-61dbc98d2237" />
-  <Project Path="WorkItemManagement.Core.Tests/WorkItemManagement.Core.Tests.csproj" />
+  <Project Path="WorkItemManagement.Core.Tests/WorkItemManagement.Core.Tests.csproj" Id="f9a3bb6b-d13b-46cb-8ddb-fb82dcbf1498" />
 </Solution>

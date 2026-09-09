@@ -147,7 +147,7 @@ public static class WbsStructureJson
 
     /// <summary>
     /// #2374: reports every node whose <c>kind</c> is absent or null, before deserialization turns
-    /// absence into <see cref="Models.WbsNodes.WbsNodeKind.Epic"/> — the enum's zero value, which
+    /// absence into <see cref="WbsNodeKind.Epic"/> — the enum's zero value, which
     /// makes "the model said Epic" indistinguishable from "the model said nothing".
     /// <para>
     /// The check lives at the JSON boundary because that is the last point where absence is still

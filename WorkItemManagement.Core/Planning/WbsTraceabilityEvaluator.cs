@@ -68,7 +68,7 @@ public static partial class WbsTraceabilityEvaluator
     /// describes the same obligation. That finding is reported as an observation and does
     /// not fold into <see cref="WbsReviewReadinessResult.IsReviewReady"/>.</para>
     ///
-    /// <para>Unresolved references are the resolver's job (<see cref="WbsRequirementReferenceResolver"/>),
+    /// <para>Unresolved references are the resolver's job (the reference resolver on the writing side, which stays with the consumer that persists nodes),
     /// which rejects the payload before it is persisted. This runs over payloads that are
     /// already stored, so an unresolvable reference here would mean a row that got past that
     /// gate — reported rather than ignored, because silently treating it as "no requirement"

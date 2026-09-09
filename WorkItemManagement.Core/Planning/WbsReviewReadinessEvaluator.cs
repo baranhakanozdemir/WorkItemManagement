@@ -31,6 +31,8 @@ public static partial class WbsReviewReadinessEvaluator
         WbsScopeFidelityBounds? bounds = null,
         IEnumerable<string>? preGeneratedEntities = null)
     {
+        ArgumentNullException.ThrowIfNull(payload);
+
         var issues = new List<string>();
 
         if (source is WbsStructureSource.DeterministicFallback)
@@ -82,6 +84,8 @@ public static partial class WbsReviewReadinessEvaluator
     /// </summary>
     public static bool TryValidateStructure(WbsStructurePayload payload, out IReadOnlyList<string> errors)
     {
+        ArgumentNullException.ThrowIfNull(payload);
+
         var issues = new List<string>();
         CollectStructuralQualityIssues(payload, issues);
         errors = issues;
@@ -230,6 +234,8 @@ public static partial class WbsReviewReadinessEvaluator
         WbsNodeKind parentKind,
         WbsNodeKind childKind)
     {
+        ArgumentNullException.ThrowIfNull(nodes);
+
         var parents = nodes.Where(node => node.Kind == parentKind).ToArray();
         if (parents.Length == 0)
         {
@@ -260,6 +266,8 @@ public static partial class WbsReviewReadinessEvaluator
         WbsNodeKind childKind,
         IEqualityComparer<string> parentKeyComparer)
     {
+        ArgumentNullException.ThrowIfNull(nodes);
+
         var parentKeysWithChildren = nodes
             .Where(node => node.Kind == childKind && !string.IsNullOrWhiteSpace(node.ParentEmittedKey))
             .Select(node => node.ParentEmittedKey!)
@@ -279,6 +287,8 @@ public static partial class WbsReviewReadinessEvaluator
         int capturedScopeItems = 0,
         WbsScopeFidelityBounds? bounds = null)
     {
+        ArgumentNullException.ThrowIfNull(nodes);
+
         var parentCount = nodes.Count(node => node.Kind == parentKind);
         var effective = bounds ?? WbsScopeFidelityBounds.Default;
         if (!effective.IsTruncationSuspectParentLevel(parentCount, capturedScopeItems))

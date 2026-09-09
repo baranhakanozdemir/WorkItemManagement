@@ -36,6 +36,11 @@ public sealed record WbsTraceabilityContext(
     /// residue — <c>ClarificationResponseWriter</c> writes <c>CL-###</c> rows from
     /// platform-authored questions and assumptions — so a capability the platform invented during
     /// clarification can appear there and then vouch for itself. The problem statement is what the
+    /// customer said before any of that, so it is the one catalogue the platform cannot have
+    /// authored — which is what makes it usable as the check on the others.
+    /// <para>(The sentence above was truncated in the source this type was extracted from, with no
+    /// closing tag; it is completed here from the argument the paragraph already makes.)</para>
+    /// </remarks>
     public IReadOnlyList<WbsTraceabilityProblem> Problems { get; init; } = [];
 
     /// <summary>
@@ -72,6 +77,16 @@ public sealed record WbsTraceabilityDeliverable(
 /// <para>Description, not Title: <c>Requirement</c> carries no Title. Objectives do, which is
 /// why <see cref="WbsTraceabilityObjective"/> differs here rather than by oversight.</para>
 /// </summary>
+/// <param name="Id">The requirement's identifier. This is what a node cites.</param>
+/// <param name="RequirementNumber">Its human-readable number, e.g. <c>R-014</c>.</param>
+/// <param name="Description">
+/// The requirement's full text. Coverage is judged against the words, so a truncated
+/// description changes the verdict rather than merely shortening the display.
+/// </param>
+/// <param name="DuplicateOfRequirementId">
+/// The requirement this one duplicates, when it duplicates one. A duplicate is covered when
+/// its representative is covered — see <see cref="RequirementDuplicateEquivalence"/>.
+/// </param>
 /// <param name="IsClarificationDerived">
 /// #2782: whether this requirement is the persisted answer to a clarification question rather than
 /// something the customer captured directly. Carried because the coverage discharge is scoped to

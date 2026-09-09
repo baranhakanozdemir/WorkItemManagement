@@ -24,7 +24,7 @@ public sealed record WbsAuthoringBufferSnapshot(
 /// into the write would make a rejected evaluation look like a failed write when the proposal is in
 /// fact stored, and an author who is told the write failed will write it again.</para>
 /// <para>To judge a proposal, read it and run
-/// <see cref="WbsReviewReadinessEvaluator.Evaluate(WbsStructurePayload, WbsStructureSource, WbsTraceabilityContext)"/>.
+/// <see cref="WbsReviewReadinessEvaluator.Evaluate"/>.
 /// That call is a pure function: it needs no database and no service.</para>
 /// </remarks>
 public interface IWbsAuthoringBufferService
