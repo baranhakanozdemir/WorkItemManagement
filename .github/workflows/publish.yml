@@ -1,10 +1,21 @@
 name: Publish package
 
-# Publishes WorkItemManagement.Core to the baranhakanozdemir GitHub Packages (NuGet) feed.
-# Runs as the repository (GITHUB_TOKEN), which can publish a package linked to this repo —
-# this is why CI can publish even though a collaborator PAT cannot on a personal namespace.
+# Publishes WorkItemManagement.Core to two feeds:
+#
+#   GitHub Packages   https://nuget.pkg.github.com/baranhakanozdemir/index.json
+#   Azure Blob (Sleet) https://plusteamstorage.blob.core.windows.net/nuget/index.json
+#
+# The Sleet feed is the one that matters for consumers that cannot hold a credential.
+# GitHub Packages' NuGet registry requires authentication even for public packages, so
+# a repository restoring WorkItemManagement.Core from there needs a PAT; from Sleet it
+# needs nothing. DomainServices.Core is already published this way for the same reason.
 on:
   workflow_dispatch:
+    inputs:
+      backfill_version:
+        description: 'An already-published version to copy to the Sleet feed (for example 0.3.1). Leave empty to build and publish the current csproj version.'
+        required: false
+        type: string
   push:
     branches: [ main ]
     paths:
@@ -24,21 +35,108 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # DomainServices.Core is a private package on the same feed. Restoring it needs the feed
-      # token; the committed nuget.config reads it from %GITHUB_TOKEN_FEED%. GITHUB_TOKEN can read
-      # it only if the DomainServices.Core package has granted this repo read access
-      # (package -> Package settings -> Manage Actions access -> add WorkItemManagement, Read).
+      - name: Resolve mode
+        id: mode
+        env:
+          BACKFILL: ${{ inputs.backfill_version }}
+        run: |
+          if [ -n "$BACKFILL" ]; then
+            echo "backfill=true" >> "$GITHUB_OUTPUT"
+            echo "version=$BACKFILL" >> "$GITHUB_OUTPUT"
+            echo "::notice::Backfilling already-published version $BACKFILL to the Sleet feed. Nothing is rebuilt."
+          else
+            echo "backfill=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Building and publishing the current csproj version."
+          fi
+
+      # ---------------- build path ----------------
+      # DomainServices.Core is on the same GitHub Packages feed. The committed nuget.config
+      # reads the token from %GITHUB_TOKEN_FEED%. GITHUB_TOKEN can read it only because that
+      # package has granted this repository read access.
       - name: Restore
+        if: steps.mode.outputs.backfill == 'false'
         env:
           GITHUB_TOKEN_FEED: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet restore WorkItemManagement.Core/WorkItemManagement.Core.csproj
 
       - name: Pack
+        if: steps.mode.outputs.backfill == 'false'
         run: dotnet pack WorkItemManagement.Core/WorkItemManagement.Core.csproj -c Release -o artifacts --no-restore
 
       - name: Publish to GitHub Packages
+        if: steps.mode.outputs.backfill == 'false'
         run: >
           dotnet nuget push "artifacts/*.nupkg"
           --source "https://nuget.pkg.github.com/baranhakanozdemir/index.json"
           --api-key ${{ secrets.GITHUB_TOKEN }}
           --skip-duplicate
+
+      # ---------------- backfill path ----------------
+      # Copies the exact published bytes rather than rebuilding, so the package on the Sleet
+      # feed is the same one consumers already resolved from GitHub Packages. Rebuilding an old
+      # version would need a tag, and this repository has none.
+      - name: Download the published package
+        if: steps.mode.outputs.backfill == 'true'
+        env:
+          VERSION: ${{ steps.mode.outputs.version }}
+        run: |
+          mkdir -p artifacts
+          url="https://nuget.pkg.github.com/baranhakanozdemir/download/workitemmanagement.core/${VERSION}/workitemmanagement.core.${VERSION}.nupkg"
+          status=$(curl -sSL -w '%{http_code}' \
+            -u "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+            -o "artifacts/WorkItemManagement.Core.${VERSION}.nupkg" \
+            "$url")
+          if [ "$status" != "200" ]; then
+            echo "::error::Download of version ${VERSION} returned HTTP ${status}. Check the version exists on GitHub Packages."
+            exit 1
+          fi
+          # A nupkg is a zip; an error page is not. Fail here rather than pushing rubbish.
+          if ! unzip -tq "artifacts/WorkItemManagement.Core.${VERSION}.nupkg" >/dev/null 2>&1; then
+            echo "::error::Downloaded file for ${VERSION} is not a valid package."
+            exit 1
+          fi
+          echo "Downloaded WorkItemManagement.Core.${VERSION}.nupkg ($(stat -c%s "artifacts/WorkItemManagement.Core.${VERSION}.nupkg") bytes)"
+
+      # ---------------- both paths ----------------
+      - name: Install Sleet
+        run: |
+          dotnet tool install --global sleet
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Publish to the Azure Blob static feed
+        env:
+          SLEET_FEED_CONNECTION: ${{ secrets.SLEET_FEED_CONNECTION }}
+        run: |
+          if [ -z "$SLEET_FEED_CONNECTION" ]; then
+            echo "::error::SLEET_FEED_CONNECTION is required to publish the Azure Blob static feed."
+            exit 1
+          fi
+
+          trap 'rm -f sleet.json' EXIT
+
+          python - <<'PY'
+          import json
+          import os
+
+          config = {
+              "sources": [
+                  {
+                      "name": "plusteam-azure",
+                      "type": "azure",
+                      "container": "nuget",
+                      "connectionString": os.environ["SLEET_FEED_CONNECTION"],
+                  }
+              ]
+          }
+
+          with open("sleet.json", "w", encoding="utf-8") as output:
+              json.dump(config, output, indent=2)
+              output.write("\n")
+          PY
+
+          # Sleet is immutable: re-pushing a version that is already there fails. That is the
+          # guard working, so a re-run reports it plainly instead of looking like a broken build.
+          if ! sleet push artifacts/*.nupkg --config sleet.json --verbosity minimal; then
+            echo "::warning::sleet push failed. If the message says the package already exists, the feed already has this version and nothing needed doing."
+            exit 1
+          fi
