@@ -19,7 +19,7 @@ public sealed class WorkItemJsonConverter : JsonConverter<WorkItem>
 
         return type switch
         {
-            WorkItemType.Epic => JsonSerializer.Deserialize<Feature>(raw, options),
+            WorkItemType.Epic => JsonSerializer.Deserialize<Epic>(raw, options),
             WorkItemType.Feature => JsonSerializer.Deserialize<Feature>(raw, options),
             WorkItemType.UserStory => JsonSerializer.Deserialize<UserStory>(raw, options),
             WorkItemType.Task => JsonSerializer.Deserialize<WorkItemManagement.Core.Task>(raw, options),

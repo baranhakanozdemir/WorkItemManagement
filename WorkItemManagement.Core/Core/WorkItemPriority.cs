@@ -6,7 +6,7 @@ namespace WorkItemManagement.Core;
 public enum WorkItemPriority
 {
     /// <summary>Normal priority — the default.</summary>
-    Medium = 4,
+    Medium = 0,
 
     /// <summary>Nice-to-have; addressed when capacity allows.</summary>
     Low = 1,
