@@ -1,0 +1,31 @@
+name: CI
+
+# Builds the solution and runs WorkItemManagement.Core.Tests on every pull request and on every
+# push to main (#11). Before this, nothing in this repository ran a test: a change here could only
+# fail at the next version bump in a consuming repository, after it had been published.
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # DomainServices.Core restores from GitHub Packages through the committed nuget.config,
+      # which reads the token from %GITHUB_TOKEN_FEED% (see publish.yml).
+      - name: Test
+        env:
+          GITHUB_TOKEN_FEED: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet test WorkItemManagement.slnx -c Release

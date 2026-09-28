@@ -59,6 +59,15 @@ jobs:
           GITHUB_TOKEN_FEED: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet restore WorkItemManagement.Core/WorkItemManagement.Core.csproj
 
+      # #11: a package is never published from a commit whose tests fail. The CI workflow runs the
+      # same tests on the pull request; this repeats them on the exact commit being packed, so a
+      # push that bypassed the pull request cannot publish untested code.
+      - name: Test
+        if: steps.mode.outputs.backfill == 'false'
+        env:
+          GITHUB_TOKEN_FEED: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet test WorkItemManagement.slnx -c Release
+
       - name: Pack
         if: steps.mode.outputs.backfill == 'false'
         run: dotnet pack WorkItemManagement.Core/WorkItemManagement.Core.csproj -c Release -o artifacts --no-restore
