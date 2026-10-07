@@ -222,12 +222,41 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
         model.Created = existing.Created;
         model.CreatedBy = existing.CreatedBy;
         model.IsDeleted = existing.IsDeleted;
+        model.Number = existing.Number;
 
         var validation = model.Validate();
         if (!validation.IsValid)
             return BaseResponse<WorkItem>.BadRequest(validation.ErrorMessages);
 
-        return await UpdateAsync(id, model, actor, cancellationToken).ConfigureAwait(false);
+        // The stored number is already copied above, so skip this class's UpdateAsync override,
+        // which would read the row again only to copy it a second time.
+        return await base.UpdateAsync(id, model, actor, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Keeps the stored <see cref="WorkItem.Number"/>: the number is owned by the server, so an
+    /// update — from a caller that sent 0, an older client, or a different value — never changes it.
+    /// </summary>
+    /// <remarks>
+    /// Copied before the base call because the base validates the incoming model before it reads
+    /// the stored row; a caller-sent negative number must be ignored, not reported as invalid.
+    /// An unknown id falls through to the base, which answers NotFound.
+    /// </remarks>
+    public override async Task<IBaseResponse<WorkItem>> UpdateAsync(
+        Guid id,
+        WorkItem model,
+        string userName,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        var existing = await _workItemRepository.GetAsync(id, cancellationToken).ConfigureAwait(false);
+        if (existing is not null)
+        {
+            model.Number = existing.Number;
+        }
+
+        return await base.UpdateAsync(id, model, userName, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IBaseResponse> DeleteByProjectAsync(

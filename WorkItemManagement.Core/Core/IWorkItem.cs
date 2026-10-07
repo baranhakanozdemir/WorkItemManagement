@@ -34,4 +34,11 @@ public interface IWorkItem : ICoreDomainModel
     /// UI; non-null on items created by a generator that needs to dedupe across re-runs.
     /// </summary>
     string? WbsKey { get; set; }
+
+    /// <summary>
+    /// The item's number within its project — 1, 2, 3… in creation order, never reused — shown
+    /// as <c>WI-&lt;n&gt;</c> (<see cref="WorkItemNumber"/>). Assigned by the consumer's persistence
+    /// on insert and owned by the server: an update never changes it. <c>0</c> means not assigned yet.
+    /// </summary>
+    int Number { get; set; }
 }
