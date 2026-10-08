@@ -259,6 +259,37 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
         return await base.UpdateAsync(id, model, userName, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// The batch path keeps each stored <see cref="WorkItem.Number"/> too: an item that already exists
+    /// takes its stored number before the base validates and saves the batch, so a caller-sent 0,
+    /// different or negative number never reaches the repository. New items are left alone — their
+    /// number is assigned by the consumer's persistence on insert.
+    /// </summary>
+    public override async Task<IBaseResponse<int>> SaveAsync(
+        Guid enterpriseId,
+        ICollection<WorkItem> models,
+        string userName,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(models);
+
+        foreach (var model in models)
+        {
+            if (model is null || model.Id == Guid.Empty)
+            {
+                continue;
+            }
+
+            var existing = await _workItemRepository.GetAsync(model.Id, cancellationToken).ConfigureAwait(false);
+            if (existing is not null)
+            {
+                model.Number = existing.Number;
+            }
+        }
+
+        return await base.SaveAsync(enterpriseId, models, userName, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<IBaseResponse> DeleteByProjectAsync(
         Guid projectId,
         Guid id,

@@ -114,6 +114,31 @@ public class WorkItemNumberTests
         Assert.Equal("Renamed", repository.Stored(stored.Id).Title);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(99)]
+    [InlineData(-1)]
+    public async Task SaveAsync_keeps_the_stored_number_of_each_existing_item(int sent)
+    {
+        var repository = new RecordingWorkItemRepository();
+        var first = repository.Seed(Story(number: 7));
+        var second = repository.Seed(Story(number: 8));
+        var service = new WorkItemService(repository, NullAuditWriter.Instance);
+
+        var batch = new List<WorkItem>
+        {
+            Story(number: sent, id: first.Id, title: "Renamed first"),
+            Story(number: sent, id: second.Id, title: "Renamed second"),
+        };
+        var response = await service.SaveAsync(EnterpriseId, batch, "tester");
+
+        Assert.True(response.IsSuccessful, response.Message);
+        Assert.Equal(7, repository.Stored(first.Id).Number);
+        Assert.Equal(8, repository.Stored(second.Id).Number);
+        Assert.Equal("Renamed first", repository.Stored(first.Id).Title);
+        Assert.Equal("Renamed second", repository.Stored(second.Id).Title);
+    }
+
     [Fact]
     public async Task UpdateAsync_for_an_unknown_id_is_still_not_found()
     {
@@ -198,8 +223,17 @@ public class WorkItemNumberTests
         public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(_rows.Remove(id));
 
-        public Task<int> SaveAsync(IEnumerable<WorkItem> models, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+        public Task<int> SaveAsync(IEnumerable<WorkItem> models, CancellationToken cancellationToken = default)
+        {
+            var count = 0;
+            foreach (var model in models)
+            {
+                _rows[model.Id] = model;
+                count++;
+            }
+
+            return Task.FromResult(count);
+        }
 
         public Task<IReadOnlyCollection<WorkItem>> GetAllByProjectAsync(Guid projectId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyCollection<WorkItem>>(_rows.Values.Where(item => item.ProjectId == projectId).ToList());
