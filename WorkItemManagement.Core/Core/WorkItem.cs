@@ -42,6 +42,9 @@ public abstract class WorkItem : CoreDomainModel, IWorkItem
     /// <inheritdoc />
     public string? WbsKey { get; set; }
 
+    /// <inheritdoc />
+    public int Number { get; set; }
+
     public WorkItem? Parent { get; set; }
 
     public ICollection<WorkItem> Children { get; set; } = new List<WorkItem>();
@@ -102,5 +105,6 @@ public abstract class WorkItem : CoreDomainModel, IWorkItem
             WbsKey is null || WbsKey.Length <= MaxWbsKeyLength,
             nameof(WbsKey),
             $"WbsKey must be {MaxWbsKeyLength} characters or fewer.");
+        validator.Require(Number >= 0, nameof(Number), "Number cannot be negative.");
     }
 }

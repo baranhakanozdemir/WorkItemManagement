@@ -23,6 +23,7 @@ to a requirement is work item management. Reading, normalizing or judging requir
 | Type | What it is |
 |---|---|
 | `WorkItem` and its kinds (`Epic`, `Feature`, `UserStory`, `Task`, `Bug`) | The executable work that exists after a plan is approved |
+| `WorkItemNumber` | The `WI-<n>` display form of `WorkItem.Number`, formatted and parsed in one place |
 | `WorkItemBlocker` | What is stopping an item, and why |
 | `WorkItemRelation` | How items relate to each other |
 | `WorkItemCommitRef` | The commits that delivered an item |
@@ -32,6 +33,11 @@ Each has a repository interface and a service. `IWorkItemStateSync` and
 `IWorkItemCompletionOverride` are the extension points a consumer implements.
 
 ## Version note
+
+**0.6.0 adds `WorkItem.Number`.** Each work item gets a number within its project (1, 2, 3…, never
+reused), shown as `WI-<n>` through `WorkItemNumber`. The consumer's persistence assigns it on insert;
+`0` means not assigned yet. The server owns it: `WorkItemService` keeps the stored number on every
+update, whatever the caller sends.
 
 **0.5.0 removes the WBS planning surface that 0.4.0 added.** 0.4.0 shipped a work-breakdown
 readiness engine, a JSON read boundary, and an authoring buffer. None of that is work item
