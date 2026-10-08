@@ -34,6 +34,9 @@ Each has a repository interface and a service. `IWorkItemStateSync` and
 
 ## Version note
 
+**0.6.1 builds against DomainServices.Core 0.3.1,** the version consumers already run. Its base
+update and batch save keep the stored `Created`, `CreatedBy` and `IsDeleted`, whatever the caller sends.
+
 **0.6.0 adds `WorkItem.Number`.** Each work item gets a number within its project (1, 2, 3…, never
 reused), shown as `WI-<n>` through `WorkItemNumber`. The consumer's persistence assigns it on insert;
 `0` means not assigned yet. The server owns it: `WorkItemService` keeps the stored number on every

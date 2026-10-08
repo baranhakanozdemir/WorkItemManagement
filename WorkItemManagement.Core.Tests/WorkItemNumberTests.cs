@@ -139,6 +139,46 @@ public class WorkItemNumberTests
         Assert.Equal("Renamed second", repository.Stored(second.Id).Title);
     }
 
+    /// <summary>
+    /// #15: the server-owned audit fields survive every update path. Through the direct
+    /// <c>UpdateAsync</c> and the batch <c>SaveAsync</c> only DomainServices.Core 0.3.1's base
+    /// protection guards them, so this fails if the package falls back to 0.3.0.
+    /// </summary>
+    [Theory]
+    [InlineData("update")]
+    [InlineData("save")]
+    [InlineData("update-by-project")]
+    public async Task A_caller_cannot_change_created_created_by_or_is_deleted(string path)
+    {
+        var repository = new RecordingWorkItemRepository();
+        var storedCreated = new DateTimeOffset(2026, 1, 15, 9, 30, 0, TimeSpan.Zero);
+        var stored = Story(number: 7);
+        stored.Created = storedCreated;
+        stored.CreatedBy = "original-author";
+        stored.IsDeleted = false;
+        repository.Seed(stored);
+        var service = new WorkItemService(repository, NullAuditWriter.Instance);
+
+        var incoming = Story(number: 7, id: stored.Id, title: "Renamed");
+        incoming.Created = new DateTimeOffset(2030, 6, 1, 0, 0, 0, TimeSpan.Zero);
+        incoming.CreatedBy = "someone-else";
+        incoming.IsDeleted = true;
+
+        var succeeded = path switch
+        {
+            "update" => (await service.UpdateAsync(stored.Id, incoming, "tester")).IsSuccessful,
+            "save" => (await service.SaveAsync(EnterpriseId, new List<WorkItem> { incoming }, "tester")).IsSuccessful,
+            _ => (await service.UpdateByProjectAsync(ProjectId, stored.Id, incoming, "tester")).IsSuccessful,
+        };
+
+        Assert.True(succeeded);
+        var after = repository.Stored(stored.Id);
+        Assert.Equal("Renamed", after.Title);
+        Assert.Equal(storedCreated, after.Created);
+        Assert.Equal("original-author", after.CreatedBy);
+        Assert.False(after.IsDeleted);
+    }
+
     [Fact]
     public async Task UpdateAsync_for_an_unknown_id_is_still_not_found()
     {
