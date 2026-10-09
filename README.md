@@ -32,6 +32,14 @@ to a requirement is work item management. Reading, normalizing or judging requir
 Each has a repository interface and a service. `IWorkItemStateSync` and
 `IWorkItemCompletionOverride` are the extension points a consumer implements.
 
+## Building
+
+`dotnet test WorkItemManagement.slnx` needs no credentials. `DomainServices.Core`, the only private
+dependency, restores from the anonymous Sleet feed that +team.ai's repositories use
+(`https://plusteamstorage.blob.core.windows.net/nuget/index.json`, see `nuget.config`).
+Publishing is separate: `.github/workflows/publish.yml` pushes the package to GitHub Packages and
+the Sleet feed with its own credentials.
+
 ## Version note
 
 **0.7.0 adds `IWorkItemService.AdminTransitionByProjectAsync`,** a platform admin's move for
