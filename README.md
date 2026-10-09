@@ -34,6 +34,13 @@ Each has a repository interface and a service. `IWorkItemStateSync` and
 
 ## Version note
 
+**0.7.0 adds `IWorkItemService.AdminTransitionByProjectAsync`,** a platform admin's move for
+unblocking a stuck project: any state to any state, including backward and out of Done or Cancelled.
+A move to Done still needs completion evidence, and is otherwise refused with
+`WorkItemService.DeliveryEvidenceRequiredCode`, now public. The new interface member is breaking on
+purpose: every `IWorkItemService` implementer must handle it. Agents and automation keep using
+`TransitionByProjectAsync` and its rules.
+
 **0.6.1 builds against DomainServices.Core 0.3.1,** the version consumers already run. Its base
 update and batch save keep the stored `Created`, `CreatedBy` and `IsDeleted`, whatever the caller sends.
 

@@ -72,4 +72,18 @@ public interface IWorkItemService : IDomainService<WorkItem>
         WorkItemState to,
         string userName,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// A platform admin's move, for unblocking a stuck project: any state to any state, including
+    /// backward and out of Done or Cancelled. A move to Done still needs completion evidence and is
+    /// otherwise refused with <see cref="WorkItemService.DeliveryEvidenceRequiredCode"/>. Only an
+    /// admin-authorised caller may use this; agents and automation use
+    /// <see cref="TransitionByProjectAsync"/>.
+    /// </summary>
+    Task<WorkItemMutationResult> AdminTransitionByProjectAsync(
+        Guid projectId,
+        Guid workItemId,
+        WorkItemState to,
+        string userName,
+        CancellationToken cancellationToken = default);
 }
