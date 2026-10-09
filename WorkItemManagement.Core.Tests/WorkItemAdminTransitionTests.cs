@@ -29,7 +29,7 @@ public class WorkItemAdminTransitionTests
 
         Assert.NotNull(result.Item);
         Assert.Equal(to, result.Item!.State);
-        Assert.Equal(to, repository.Stored(stored.Id).State);
+        Assert.Equal((stored.Id, to), Assert.Single(repository.Updates));
         Assert.Empty(result.Warnings);
     }
 
@@ -41,7 +41,7 @@ public class WorkItemAdminTransitionTests
         var result = await service.AdminTransitionByProjectAsync(ProjectId, stored.Id, WorkItemState.Done, "admin");
 
         Assert.Equal(WorkItemState.Done, result.Item!.State);
-        Assert.Equal(WorkItemState.Done, repository.Stored(stored.Id).State);
+        Assert.Equal((stored.Id, WorkItemState.Done), Assert.Single(repository.Updates));
         Assert.DoesNotContain(result.Warnings, warning => warning.Code == WorkItemService.DeliveryEvidenceRequiredCode);
     }
 
@@ -54,6 +54,7 @@ public class WorkItemAdminTransitionTests
 
         Assert.Equal(WorkItemState.Doing, result.Item!.State);
         Assert.Equal(WorkItemState.Doing, repository.Stored(stored.Id).State);
+        Assert.Empty(repository.Updates);
         var warning = Assert.Single(result.Warnings);
         Assert.Equal(WorkItemService.DeliveryEvidenceRequiredCode, warning.Code);
         Assert.Equal("work-item.transition.delivery-evidence-required", WorkItemService.DeliveryEvidenceRequiredCode);
@@ -67,7 +68,7 @@ public class WorkItemAdminTransitionTests
         var result = await service.AdminTransitionByProjectAsync(ProjectId, stored.Id, WorkItemState.Done, "admin");
 
         Assert.Equal(WorkItemState.Done, result.Item!.State);
-        Assert.Equal(WorkItemState.Done, repository.Stored(stored.Id).State);
+        Assert.Empty(repository.Updates);
         Assert.Empty(result.Warnings);
     }
 
@@ -80,6 +81,18 @@ public class WorkItemAdminTransitionTests
 
         Assert.Same(WorkItemMutationResult.Missing, result);
         Assert.Equal(WorkItemState.Review, repository.Stored(stored.Id).State);
+        Assert.Empty(repository.Updates);
+    }
+
+    [Fact]
+    public async Task An_item_in_another_project_is_missing_even_with_an_unknown_state()
+    {
+        var (service, repository, stored) = Arrange(WorkItemState.Review);
+
+        var result = await service.AdminTransitionByProjectAsync(OtherProjectId, stored.Id, (WorkItemState)99, "admin");
+
+        Assert.Same(WorkItemMutationResult.Missing, result);
+        Assert.Empty(repository.Updates);
     }
 
     [Fact]
@@ -103,6 +116,7 @@ public class WorkItemAdminTransitionTests
 
         Assert.Equal(from, result.Item!.State);
         Assert.Equal(from, repository.Stored(stored.Id).State);
+        Assert.Empty(repository.Updates);
         Assert.Equal(code, Assert.Single(result.Warnings).Code);
     }
 

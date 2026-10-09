@@ -410,15 +410,17 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
         string userName,
         CancellationToken cancellationToken = default)
     {
-        if (!Enum.IsDefined(to))
-        {
-            throw new ArgumentOutOfRangeException(nameof(to), to, "Unknown work item state.");
-        }
-
+        // Project scope first, as in TransitionByProjectAsync: an item outside the project is
+        // Missing whatever state was asked for.
         var item = await _workItemRepository.GetByProjectAsync(projectId, workItemId, cancellationToken).ConfigureAwait(false);
         if (item is null)
         {
             return WorkItemMutationResult.Missing;
+        }
+
+        if (!Enum.IsDefined(to))
+        {
+            throw new ArgumentOutOfRangeException(nameof(to), to, "Unknown work item state.");
         }
 
         var from = item.State;

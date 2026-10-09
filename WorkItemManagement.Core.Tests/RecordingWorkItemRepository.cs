@@ -7,12 +7,16 @@ namespace WorkItemManagement.Core.Tests;
 using Task = System.Threading.Tasks.Task;
 
 /// <summary>
-/// Holds its own copy of each row, so the stored item and the caller's model are never the same
-/// object — a test that shares one instance would pass whatever the service did.
+/// An in-memory <see cref="IWorkItemRepository"/> that keeps the instance it is given: the getters
+/// return the stored object itself, so a service that mutates what it read changes
+/// <see cref="Stored"/> without saving anything. A test that needs to prove a write happened
+/// asserts on <see cref="Updates"/>, the state each item had when <see cref="UpdateAsync"/> was
+/// called.
 /// </summary>
 internal sealed class RecordingWorkItemRepository : IWorkItemRepository
 {
     private readonly Dictionary<Guid, WorkItem> _rows = new();
+    private readonly List<(Guid Id, WorkItemState State)> _updates = new();
 
     public WorkItem Seed(WorkItem item)
     {
@@ -22,6 +26,9 @@ internal sealed class RecordingWorkItemRepository : IWorkItemRepository
 
     public WorkItem Stored(Guid id) => _rows[id];
 
+    /// <summary>Every <see cref="UpdateAsync"/> call, with the item's state at that moment.</summary>
+    public IReadOnlyList<(Guid Id, WorkItemState State)> Updates => _updates;
+
     public Task<WorkItem?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_rows.TryGetValue(id, out var item) ? item : null);
 
@@ -30,6 +37,7 @@ internal sealed class RecordingWorkItemRepository : IWorkItemRepository
 
     public Task<WorkItem> UpdateAsync(WorkItem model, CancellationToken cancellationToken = default)
     {
+        _updates.Add((model.Id, model.State));
         _rows[model.Id] = model;
         return Task.FromResult(model);
     }
