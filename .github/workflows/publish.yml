@@ -50,13 +50,10 @@ jobs:
           fi
 
       # ---------------- build path ----------------
-      # DomainServices.Core is on the same GitHub Packages feed. The committed nuget.config
-      # reads the token from %GITHUB_TOKEN_FEED%. GITHUB_TOKEN can read it only because that
-      # package has granted this repository read access.
+      # #17: DomainServices.Core restores from the anonymous Sleet feed through the committed
+      # nuget.config, so restore and test need no feed credential. The pushes below use their own.
       - name: Restore
         if: steps.mode.outputs.backfill == 'false'
-        env:
-          GITHUB_TOKEN_FEED: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet restore WorkItemManagement.Core/WorkItemManagement.Core.csproj
 
       # #11: a package is never published from a commit whose tests fail. The CI workflow runs the
@@ -64,8 +61,6 @@ jobs:
       # push that bypassed the pull request cannot publish untested code.
       - name: Test
         if: steps.mode.outputs.backfill == 'false'
-        env:
-          GITHUB_TOKEN_FEED: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet test WorkItemManagement.slnx -c Release
 
       - name: Pack
