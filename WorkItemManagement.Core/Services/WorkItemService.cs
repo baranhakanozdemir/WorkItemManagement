@@ -11,7 +11,12 @@ namespace WorkItemManagement.Core.Services;
 
 public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
 {
-    private const string DeliveryEvidenceRequiredCode = "work-item.transition.delivery-evidence-required";
+    /// <summary>
+    /// The warning code on a move to Done that is refused for lack of completion evidence. Public
+    /// so a host can tell this refusal apart from the others: the admin API records a manual
+    /// delivery exception on exactly this code and retries.
+    /// </summary>
+    public const string DeliveryEvidenceRequiredCode = "work-item.transition.delivery-evidence-required";
     private const string DeliveryEvidenceRequiredMessage =
         "Work item cannot transition to Done without a verified passing delivery commit reference or a recorded manual delivery exception.";
 
@@ -383,6 +388,76 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
             return new WorkItemMutationResult(item, blocked);
         }
 
+        return await CompleteTransitionAsync(item, to, userName, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// #18: a platform admin's move, for unblocking a stuck project. Any state to any state:
+    /// backward, and out of Done or Cancelled, which <see cref="TransitionAsync"/> refuses.
+    /// </summary>
+    /// <remarks>
+    /// <para>The completion-evidence rule is kept. A move to Done without a commit reference or a
+    /// completion override is refused with <see cref="DeliveryEvidenceRequiredCode"/>, so every
+    /// Done item still has evidence; the host records a manual delivery exception and retries.</para>
+    /// <para>The same-state check comes first. <see cref="TransitionAsync"/> checks terminal
+    /// states first and so refuses Done → Done; an admin repeating a move is a no-op, not an
+    /// error.</para>
+    /// </remarks>
+    public async Task<WorkItemMutationResult> AdminTransitionByProjectAsync(
+        Guid projectId,
+        Guid workItemId,
+        WorkItemState to,
+        string userName,
+        CancellationToken cancellationToken = default)
+    {
+        // Project scope first, as in TransitionByProjectAsync: an item outside the project is
+        // Missing whatever state was asked for.
+        var item = await _workItemRepository.GetByProjectAsync(projectId, workItemId, cancellationToken).ConfigureAwait(false);
+        if (item is null)
+        {
+            return WorkItemMutationResult.Missing;
+        }
+
+        if (!Enum.IsDefined(to))
+        {
+            throw new ArgumentOutOfRangeException(nameof(to), to, "Unknown work item state.");
+        }
+
+        var from = item.State;
+        if (from == to)
+        {
+            return WorkItemMutationResult.Success(item);
+        }
+
+        var overridesNormalRules = IsTerminal(from)
+            || (to != WorkItemState.Cancelled && IsBackwardTransition(from, to));
+
+        var result = await CompleteTransitionAsync(item, to, userName, cancellationToken).ConfigureAwait(false);
+        if (overridesNormalRules && result.Item?.State == to)
+        {
+            _logger.LogWarning(
+                "WorkItem {WorkItemId} moved by admin {UserName} from {FromState} to {ToState}, a move the normal transition rules refuse",
+                workItemId,
+                userName,
+                from,
+                to);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// The part of a transition both <see cref="TransitionAsync"/> and
+    /// <see cref="AdminTransitionByProjectAsync"/> share once the direction is allowed: the
+    /// completion-evidence gate, the skipped-state warning, the save and the external write-back.
+    /// </summary>
+    private async Task<WorkItemMutationResult> CompleteTransitionAsync(
+        WorkItem item,
+        WorkItemState to,
+        string userName,
+        CancellationToken cancellationToken)
+    {
+        var from = item.State;
         var warnings = new List<WorkItemValidationWarning>();
         if (to == WorkItemState.Done
             && !await HasCompletionEvidenceAsync(item.ProjectId, item.Id, cancellationToken).ConfigureAwait(false))
@@ -398,7 +473,7 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
             // AC: skipping states is allowed (do not block) but logged at Warning level.
             _logger.LogWarning(
                 "WorkItem {WorkItemId} transitioned from {FromState} to {ToState}, skipping intermediates: {Skipped}",
-                workItemId,
+                item.Id,
                 from,
                 to,
                 string.Join(", ", skipped));
@@ -412,9 +487,9 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
         if (!response.IsSuccessful || response.Data is null)
         {
             // Persistence / validation error on a known-existing item — surface it.
-            // Genuine missing-row races would have been caught by the GetAsync above.
+            // Genuine missing-row races would have been caught by the lookup before this.
             throw new InvalidOperationException(
-                $"Failed to transition work item {workItemId} from {from} to {to}: {response.Message ?? "no message"}");
+                $"Failed to transition work item {item.Id} from {from} to {to}: {response.Message ?? "no message"}");
         }
 
         await TryWriteBackStateAsync(response.Data, userName, cancellationToken).ConfigureAwait(false);
