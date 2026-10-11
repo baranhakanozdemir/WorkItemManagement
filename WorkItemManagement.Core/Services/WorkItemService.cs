@@ -172,18 +172,14 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
             .Where(IsStartableExecutionItem)
             .Where(item => assignedTo is null || item.AssignedToId == assignedTo)
             .Where(item => !HasActiveBlocker(item, blockersByBlockedItem, itemsById))
-            .OrderBy(StartableOrderKey, StringComparer.Ordinal)
-            .ThenBy(item => item.Title, StringComparer.Ordinal)
-            .ThenBy(item => item.Id)
+            .Order(StartableWorkItemOrder.Instance)
             .ToArray();
 
         return startable
             .GroupBy(item => item.AssignedToId ?? Guid.Empty)
             .OrderBy(group => group.Key)
             .SelectMany(group => group.Take(safeMaxPerAssignee))
-            .OrderBy(StartableOrderKey, StringComparer.Ordinal)
-            .ThenBy(item => item.Title, StringComparer.Ordinal)
-            .ThenBy(item => item.Id)
+            .Order(StartableWorkItemOrder.Instance)
             .ToArray();
     }
 
@@ -650,9 +646,6 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
             BlockerKind.DecisionGate or BlockerKind.External => true,
             _ => true,
         };
-
-    private static string StartableOrderKey(WorkItem item) =>
-        item.WbsKey ?? string.Empty;
 
     private static bool IsBackwardTransition(WorkItemState from, WorkItemState to)
     {
