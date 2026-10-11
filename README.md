@@ -42,6 +42,12 @@ the Sleet feed with its own credentials.
 
 ## Version note
 
+**0.8.0 changes the order of `GetStartableByProjectAsync`.** Among stories that are ready at the same
+time, the customer's priority comes first (Critical, High, Medium, Low), then the plan's natural order
+for lead-authored keys (`wbs:lead:E1-F2` before `wbs:lead:E1-F10`), then the WI number. Items without
+a lead-authored key, such as follow-up bugs, follow the planned stories of the same priority. The
+signature is unchanged; callers that re-sort the result by `WbsKey` undo this order and should stop.
+
 **0.7.0 adds `IWorkItemService.AdminTransitionByProjectAsync`,** a platform admin's move for
 unblocking a stuck project: any state to any state, including backward and out of Done or Cancelled.
 A move to Done still needs completion evidence, and is otherwise refused with
