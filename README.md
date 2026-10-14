@@ -42,6 +42,12 @@ the Sleet feed with its own credentials.
 
 ## Version note
 
+**0.9.0 changes what `GetStartableByProjectAsync` returns.** A lane that holds a story or bug in
+progress (Doing, Testing or Review) is not offered another one: nothing is returned for it until that
+item is Done or Cancelled. A task in progress does not count, because only stories and bugs are
+dispatched. The signature is unchanged. A caller that compares the result before and after a merge,
+as +team.ai's merge handler does, now sees the merged lane's next story as newly startable.
+
 **0.8.0 changes the order of `GetStartableByProjectAsync`.** Among stories that are ready at the same
 time, the customer's priority comes first (Critical, High, Medium, Low), then the plan's natural order
 for lead-authored keys (`wbs:lead:E1-F2` before `wbs:lead:E1-F10`), then the WI number. Items without

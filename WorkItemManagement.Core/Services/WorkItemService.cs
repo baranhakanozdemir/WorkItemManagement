@@ -168,8 +168,17 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
             .GroupBy(blocker => blocker.BlockedItemId)
             .ToDictionary(group => group.Key, group => group.ToArray());
 
+        // #23: a lane works one story at a time. While it holds a story or bug in progress it is not
+        // offered another, so a dispatch never lands on a busy lane and, when that story merges, the
+        // lane's next story is newly startable for the merge handler to start.
+        var busyLanes = items
+            .Where(IsLaneHoldingWorkInProgress)
+            .Select(item => item.AssignedToId!.Value)
+            .ToHashSet();
+
         var startable = items
             .Where(IsStartableExecutionItem)
+            .Where(item => !busyLanes.Contains(item.AssignedToId!.Value))
             .Where(item => assignedTo is null || item.AssignedToId == assignedTo)
             .Where(item => !HasActiveBlocker(item, blockersByBlockedItem, itemsById))
             .Order(StartableWorkItemOrder.Instance)
@@ -620,6 +629,13 @@ public class WorkItemService : AuditedDomainService<WorkItem>, IWorkItemService
         item.Type is WorkItemType.UserStory or WorkItemType.Bug
         && item.AssignedToId is not null
         && item.State is WorkItemState.Backlog or WorkItemState.ToDo;
+
+    // #23: started and not yet Done or Cancelled. Only stories and bugs are dispatch units, so a task
+    // in progress does not make its lane busy.
+    private static bool IsLaneHoldingWorkInProgress(WorkItem item) =>
+        item.Type is WorkItemType.UserStory or WorkItemType.Bug
+        && item.AssignedToId is not null
+        && item.State is WorkItemState.Doing or WorkItemState.Testing or WorkItemState.Review;
 
     private static bool HasActiveBlocker(
         WorkItem item,
